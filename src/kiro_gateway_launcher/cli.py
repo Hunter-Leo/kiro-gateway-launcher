@@ -14,7 +14,9 @@ function bodies so that steps 1 and 2 always complete first.
 """
 
 import argparse
+import os
 import sys
+from pathlib import Path
 
 from kiro_gateway_launcher.config_loader import USER_ENV, ConfigLoader
 from kiro_gateway_launcher.config_editor import ConfigEditor
@@ -172,9 +174,6 @@ def _validate_credentials(kiro_main) -> None:  # type: ignore[no-untyped-def]
     Raises:
         SystemExit: With code 1 if no valid credentials are found.
     """
-    import os
-    from pathlib import Path
-
     has_refresh_token = bool(kiro_main.REFRESH_TOKEN)
     has_creds_file = bool(kiro_main.KIRO_CREDS_FILE) and Path(
         kiro_main.KIRO_CREDS_FILE
