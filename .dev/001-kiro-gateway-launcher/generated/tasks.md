@@ -2,21 +2,21 @@
 
 ## 状态表
 
-| ID    | 任务名称                        | 状态        | 备注 |
-|-------|---------------------------------|-------------|------|
-| T-001 | 配置 pyproject.toml             | not-started |      |
-| T-002 | 实现 config_loader.py           | not-started |      |
-| T-003 | config_loader 单元测试          | not-started |      |
-| T-004 | 实现 repo_manager.py            | not-started |      |
-| T-005 | repo_manager 单元测试           | not-started |      |
-| T-006 | 实现 setup_wizard.py            | not-started |      |
-| T-007 | setup_wizard 单元测试           | not-started |      |
-| T-008 | 实现 config_editor.py           | not-started |      |
-| T-009 | config_editor 单元测试          | not-started |      |
-| T-010 | 实现 updater.py                 | not-started |      |
-| T-011 | updater 单元测试                | not-started |      |
-| T-012 | 实现 cli.py                     | not-started |      |
-| T-013 | 端到端冒烟测试                  | not-started |      |
+| ID    | 任务名称                        | 状态     | 备注 |
+|-------|---------------------------------|----------|------|
+| T-001 | 配置 pyproject.toml             | done     |      |
+| T-002 | 实现 config_loader.py           | done     |      |
+| T-003 | config_loader 单元测试          | done     |      |
+| T-004 | 实现 repo_manager.py            | done     |      |
+| T-005 | repo_manager 单元测试           | done     |      |
+| T-006 | 实现 setup_wizard.py            | done     |      |
+| T-007 | setup_wizard 单元测试           | done     |      |
+| T-008 | 实现 config_editor.py           | done     |      |
+| T-009 | config_editor 单元测试          | done     |      |
+| T-010 | 实现 updater.py                 | done     |      |
+| T-011 | updater 单元测试                | done     |      |
+| T-012 | 实现 cli.py                     | done     |      |
+| T-013 | 端到端冒烟测试                  | done     |      |
 
 ---
 
@@ -40,7 +40,11 @@
 
 **参考：** `plan.md § Technology Decisions`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- 配置 `pyproject.toml`：包名 `kiro-gateway-launcher`，入口点 `kiro-gateway-launcher.cli:main`
+- 声明 kiro 运行时依赖：fastapi, uvicorn[standard], httpx, loguru, python-dotenv, tiktoken
+- 创建 `src/kiro_gateway_launcher/__init__.py` 和 `tests/__init__.py`
+- `uv build` 和 `uv run kiro-gateway-launcher --help` 验证通过
 
 ---
 
@@ -61,7 +65,12 @@
 
 **参考：** `plan.md § ConfigLoader — priority chain`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- `ConfigLoader` 类，提供 `load() -> None` 方法
+- 路径常量：`CONFIG_DIR = ~/.config/kiro-gateway/`，`USER_ENV = CONFIG_DIR / ".env"`
+- 加载优先级：cwd `.env`（高）→ USER_ENV（低）→ os.environ（最高，不覆盖）
+- 自定义解析 KEY=VALUE，跳过注释行和空行
+- 文件不存在时静默跳过；文件存在但不可读时打印警告
 
 ---
 
@@ -82,7 +91,9 @@
 
 **参考：** `src/kiro_gateway_launcher/config_loader.py`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- 9 个单元测试覆盖优先级逻辑和边界情况
+- 测试：USER_ENV 加载、cwd .env 覆盖、os.environ 不覆盖、文件不存在、注释/空行、多等号解析
 
 ---
 
@@ -106,7 +117,14 @@
 
 **参考：** `plan.md § RepoManager — 运行时 clone 与 sys.path 注入`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- `RepoManager` 类，管理 kiro-gateway 源码的 clone/pull
+- 常量：`UPSTREAM = "https://github.com/jwadow/kiro-gateway"`，`REPO_DIR = ~/.local/share/kiro-gateway-launcher/repo/`
+- `ensure()`：若 REPO_DIR 不存在则 clone，然后注入 sys.path
+- `pull()`：执行 git pull
+- `head_sha()`：读取本地 repo 的当前 commit SHA
+- `_inject_sys_path()`：将 REPO_DIR 插入 `sys.path[0]`（幂等）
+- git 不在 PATH 或 clone/pull 失败时打印错误并 exit(1)
 
 ---
 
@@ -127,7 +145,9 @@
 
 **参考：** `src/kiro_gateway_launcher/repo_manager.py`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- 9 个单元测试覆盖 clone/pull/sys.path 逻辑
+- 测试：REPO_DIR 不存在时 clone、已存在时跳过、sys.path 幂等注入、head_sha 读取、git 不在 PATH 时 exit
 
 ---
 
@@ -151,7 +171,16 @@
 
 **参考：** `plan.md § SetupWizard — credential type dispatch (OCP)`，`init.md § F3`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- `SetupWizard` 类，接受 `WizardIO` protocol 参数（DIP）
+- `WizardIO` Protocol：`prompt()`, `confirm()`, `print()`
+- `CredentialType(StrEnum)`：`JSON_FILE`、`REFRESH_TOKEN`、`SQLITE_DB`
+- `CredentialHandler(ABC)`：`prompt(io: WizardIO) -> dict[str, str]`
+- 三个具体 handler：`JsonFileHandler`、`RefreshTokenHandler`、`SqliteDbHandler`
+- `detect_credentials()`：自动检测 kiro-cli/amazon-q SQLite 数据库
+- `needs_setup()`：检查 USER_ENV 中是否缺少凭证
+- `run()`：引导流程，支持自动检测确认或手动选择凭证类型
+- `KeyboardInterrupt` 时打印友好信息并 exit(0)
 
 ---
 
@@ -171,7 +200,9 @@
 
 **参考：** `src/kiro_gateway_launcher/setup_wizard.py`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- 16 个单元测试覆盖 wizard 流程和各凭证类型处理
+- 测试：needs_setup()、detect_credentials()、三种凭证类型 prompt、自动检测确认/跳过、KeyboardInterrupt
 
 ---
 
@@ -193,7 +224,15 @@
 
 **参考：** `init.md § F4`，`plan.md § config 命令流程`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- `ConfigEditor` 类，提供交互式配置编辑器
+- 21 个配置变量，分 4 组：Credentials(3)、Server(3)、Network(4)、Advanced(11)
+- `ConfigVar` dataclass：支持 `allowed_values` 和 `value_descriptions`
+- `show()`：编号列表显示所有变量，敏感值遮蔽为 `****`
+- `show_path()`：打印 USER_ENV 绝对路径
+- `reset()`：二次确认后删除 USER_ENV
+- `_edit_var()`：编辑单个变量，显示 allowed_values 详细说明
+- 支持 `FAKE_REASONING_HANDLING` 等枚举值的详细说明
 
 ---
 
@@ -213,7 +252,9 @@
 
 **参考：** `src/kiro_gateway_launcher/config_editor.py`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- 13 个单元测试覆盖显示、遮蔽、重置逻辑
+- 测试：敏感值遮蔽、文件不存在友好提示、show_path、reset 确认/取消
 
 ---
 
@@ -235,7 +276,14 @@
 
 **参考：** `plan.md § Updater — git pull 更新`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- `Updater` 类，依赖注入 `RepoManager`
+- 使用 `git fetch origin main` 检查更新（避免 GitHub API 速率限制）
+- 使用 `git rev-parse origin/main` 获取远程 SHA
+- 使用 `git pull origin main` 应用更新
+- 对比本地 SHA 与远程 SHA，不同时执行 pull
+- 若 repo 不存在，先调用 `RepoManager.ensure()` 再更新
+- git 命令失败时打印明确错误并 exit(1)
 
 ---
 
@@ -255,7 +303,9 @@
 
 **参考：** `src/kiro_gateway_launcher/updater.py`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- 6 个单元测试覆盖版本对比和更新逻辑
+- 测试：SHA 相同不 pull、SHA 不同执行 pull、git fetch/rev-parse/pull 失败时 exit
 
 ---
 
@@ -285,7 +335,19 @@
 
 **参考：** `plan.md § Config injection timing (critical)`，`plan.md § config 命令流程`，`init.md § F4`
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- `main()` 函数：① `ConfigLoader().load()` → ② `RepoManager().ensure()` → ③ 解析参数 → ④ 分发
+- 子命令：
+  - `config`（无参数）→ `ConfigEditor.show()`：交互式配置编辑器
+  - `config --edit` → `SetupWizard.run()`：重新运行完整 wizard
+  - `config --reset` → `ConfigEditor.reset()`：删除配置文件（需确认）
+  - `config --show-path` → `ConfigEditor.show_path()`：打印配置文件路径
+  - `update` → `Updater.run()`：git fetch + pull 更新
+  - 默认（无子命令）→ 检查凭证 → 若缺失则 `SetupWizard.run()` → 启动 uvicorn
+- `--host` / `-H`，`--port` / `-p` 参数
+- 凭证无效时打印明确错误，指向 `~/.config/kiro-gateway/.env`
+- 捕获 `ImportError`（kiro import 失败）并打印可操作提示
+- 所有 `import kiro.*` 在函数体内（延迟导入）
 
 ---
 
@@ -306,4 +368,11 @@
 
 **参考：** 全部源文件
 
-**实现摘要：** *(任务完成后填写)*
+**实现摘要：**
+- `uv build` 成功生成 wheel 包
+- `uv run kiro-gateway-launcher --help` 显示正确帮助信息
+- `uv run kiro-gateway-launcher config --show-path` 输出正确路径
+- `uv run kiro-gateway-launcher update` 使用 git fetch/pull 更新（避免 GitHub API 速率限制）
+- `uv run kiro-gateway-launcher config` 启动交互式配置编辑器
+- 所有 67 个单元测试通过
+- 配置变量与 kiro-gateway main 分支同步（21 个变量）
