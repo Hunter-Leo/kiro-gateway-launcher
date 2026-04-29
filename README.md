@@ -23,7 +23,7 @@ This project depends on:
 
 ```bash
 # Install via uv
-uv tool install git+https://github.com/Hunter-Leo/kiro-gateway-launcher.git
+uv tool install git+https://github.com/Hunter-Leo/kiro-gateway-launcher
 ```
 
 ## Quick Start
