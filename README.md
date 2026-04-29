@@ -168,17 +168,6 @@ Run the setup wizard:
 kiro-gateway-launcher config --edit
 ```
 
-### "cannot import kiro-gateway"
-
-Update the kiro-gateway source:
-```bash
-kiro-gateway-launcher update
-```
-
-### "GitHub API rate limit exceeded"
-
-The `update` command now uses `git fetch` directly, avoiding GitHub API rate limits.
-
 ### "thinking budget exceeds cap"
 
 Set `FAKE_REASONING_BUDGET_CAP=0` to disable the cap:
