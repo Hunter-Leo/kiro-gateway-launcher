@@ -188,6 +188,11 @@ CONFIG_GROUPS: list[ConfigGroup] = [
                 default="4000",
             ),
             ConfigVar(
+                key="FAKE_REASONING_BUDGET_CAP",
+                description="Max thinking budget cap (0 = disabled)",
+                default="10000",
+            ),
+            ConfigVar(
                 key="FAKE_REASONING_HANDLING",
                 description="How to handle thinking blocks in responses",
                 default="as_reasoning_content",
