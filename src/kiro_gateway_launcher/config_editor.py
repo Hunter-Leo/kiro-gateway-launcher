@@ -120,6 +120,14 @@ CONFIG_GROUPS: list[ConfigGroup] = [
                 description="AWS region",
                 default="us-east-1",
             ),
+            ConfigVar(
+                key="KIRO_API_REGION",
+                description="Kiro API region (if different from AWS region)",
+            ),
+            ConfigVar(
+                key="PROFILE_ARN",
+                description="AWS Profile ARN for per-account override",
+            ),
         ],
     ),
     ConfigGroup(
