@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Test cache
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# OMC runtime state (prd.json and project-memory.json are committed)
+.omc/state/
