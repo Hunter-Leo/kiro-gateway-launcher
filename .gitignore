@@ -17,3 +17,10 @@ wheels/
 
 # OMC runtime state
 .omc/
+
+# Sensitive files
+credentials.json
+state.json
+
+# Leftover from initial setup
+main.py
