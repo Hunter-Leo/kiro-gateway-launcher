@@ -1,9 +1,7 @@
 """Unit tests for Updater."""
 
-import json
-from io import BytesIO
+from subprocess import CalledProcessError, CompletedProcess
 from unittest.mock import MagicMock, patch
-import urllib.error
 
 import pytest
 
@@ -17,14 +15,31 @@ def _make_mock_repo(local_sha: str) -> MagicMock:
     return repo
 
 
-def _make_urlopen_response(sha: str):
-    """Return a context-manager mock that yields a GitHub API response."""
-    body = json.dumps({"sha": sha}).encode()
-    mock_response = MagicMock()
-    mock_response.read.return_value = body
-    mock_response.__enter__ = lambda s: s
-    mock_response.__exit__ = MagicMock(return_value=False)
-    return mock_response
+def _make_completed_process(stdout: str = "", stderr: str = "", returncode: int = 0, text: bool = True):
+    """Create a mock CompletedProcess for subprocess.run.
+
+    Args:
+        stdout: Standard output (string if text=True, bytes if text=False)
+        stderr: Standard error (string if text=True, bytes if text=False)
+        returncode: Exit code
+        text: Whether the process was run with text=True
+    """
+    if text:
+        # When text=True, stdout/stderr are strings
+        return CompletedProcess(
+            args=["git", "fetch"],
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+    else:
+        # When text=False, stdout/stderr are bytes
+        return CompletedProcess(
+            args=["git", "fetch"],
+            returncode=returncode,
+            stdout=stdout.encode() if isinstance(stdout, str) else stdout,
+            stderr=stderr.encode() if isinstance(stderr, str) else stderr,
+        )
 
 
 class TestUpdaterRun:
@@ -35,7 +50,14 @@ class TestUpdaterRun:
         sha = "abc1234" * 5 + "abcd"  # 40 chars
         repo = _make_mock_repo(sha)
 
-        with patch("urllib.request.urlopen", return_value=_make_urlopen_response(sha)):
+        # Mock subprocess.run for both git fetch and git rev-parse
+        with patch(
+            "kiro_gateway_launcher.updater.subprocess.run",
+            side_effect=[
+                _make_completed_process(),  # git fetch
+                _make_completed_process(stdout=sha + "\n"),  # git rev-parse origin/main (with newline)
+            ],
+        ):
             Updater(repo=repo).run()
 
         repo.pull.assert_not_called()
@@ -48,20 +70,70 @@ class TestUpdaterRun:
         remote_sha = "bbb" * 13 + "b"  # 40 chars
         repo = _make_mock_repo(local_sha)
 
-        with patch("urllib.request.urlopen", return_value=_make_urlopen_response(remote_sha)):
+        with patch(
+            "kiro_gateway_launcher.updater.subprocess.run",
+            side_effect=[
+                _make_completed_process(),  # git fetch
+                _make_completed_process(stdout=remote_sha),  # git rev-parse origin/main
+                _make_completed_process(),  # git pull
+            ],
+        ):
             Updater(repo=repo).run()
 
-        repo.pull.assert_called_once()
+        repo.pull.assert_not_called()  # We use subprocess.run for pull, not repo.pull
         captured = capsys.readouterr()
         assert "aaa" in captured.out  # local short SHA
         assert "bbb" in captured.out  # remote short SHA
 
-    def test_exits_on_network_failure(self) -> None:
-        """Network failure causes sys.exit(1)."""
+    def test_exits_on_git_fetch_failure(self) -> None:
+        """Git fetch failure causes sys.exit(1)."""
         repo = _make_mock_repo("abc" * 13 + "a")
 
-        url_error = urllib.error.URLError("connection refused")
-        with patch("urllib.request.urlopen", side_effect=url_error):
+        with patch(
+            "kiro_gateway_launcher.updater.subprocess.run",
+            side_effect=CalledProcessError(
+                returncode=128, cmd=["git", "fetch"], stderr=b"fatal: network error"
+            ),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                Updater(repo=repo).run()
+
+        assert exc_info.value.code == 1
+
+    def test_exits_on_git_rev_parse_failure(self) -> None:
+        """Git rev-parse failure causes sys.exit(1)."""
+        repo = _make_mock_repo("abc" * 13 + "a")
+
+        with patch(
+            "kiro_gateway_launcher.updater.subprocess.run",
+            side_effect=[
+                _make_completed_process(),  # git fetch succeeds
+                CalledProcessError(
+                    returncode=128, cmd=["git", "rev-parse"], stderr=b"fatal: not a git repo"
+                ),
+            ],
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                Updater(repo=repo).run()
+
+        assert exc_info.value.code == 1
+
+    def test_exits_on_git_pull_failure(self) -> None:
+        """Git pull failure causes sys.exit(1)."""
+        local_sha = "aaa" * 13 + "a"
+        remote_sha = "bbb" * 13 + "b"
+        repo = _make_mock_repo(local_sha)
+
+        with patch(
+            "kiro_gateway_launcher.updater.subprocess.run",
+            side_effect=[
+                _make_completed_process(),  # git fetch succeeds
+                _make_completed_process(stdout=remote_sha),  # git rev-parse succeeds
+                CalledProcessError(
+                    returncode=1, cmd=["git", "pull"], stderr=b"error: merge conflict"
+                ),
+            ],
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 Updater(repo=repo).run()
 
@@ -76,23 +148,14 @@ class TestUpdaterRun:
         repo.ensure.side_effect = lambda: call_order.append("ensure")
         repo.head_sha.side_effect = lambda: call_order.append("head_sha") or sha
 
-        with patch("urllib.request.urlopen", return_value=_make_urlopen_response(sha)):
+        with patch(
+            "kiro_gateway_launcher.updater.subprocess.run",
+            side_effect=[
+                _make_completed_process(),  # git fetch
+                _make_completed_process(stdout=sha + "\n"),  # git rev-parse origin/main (with newline)
+            ],
+        ):
             Updater(repo=repo).run()
 
         assert call_order[0] == "ensure"
         assert "head_sha" in call_order
-
-    def test_exits_on_malformed_api_response(self) -> None:
-        """Malformed JSON response causes sys.exit(1)."""
-        repo = _make_mock_repo("abc" * 13 + "a")
-
-        bad_response = MagicMock()
-        bad_response.read.return_value = b'{"not_sha": "oops"}'
-        bad_response.__enter__ = lambda s: s
-        bad_response.__exit__ = MagicMock(return_value=False)
-
-        with patch("urllib.request.urlopen", return_value=bad_response):
-            with pytest.raises(SystemExit) as exc_info:
-                Updater(repo=repo).run()
-
-        assert exc_info.value.code == 1
