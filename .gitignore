@@ -18,6 +18,9 @@ wheels/
 # OMC runtime state
 .omc/
 
+# Claude Code session files
+.claude/
+
 # Sensitive files
 credentials.json
 state.json
