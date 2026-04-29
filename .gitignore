@@ -15,5 +15,5 @@ wheels/
 # macOS
 .DS_Store
 
-# OMC runtime state (prd.json and project-memory.json are committed)
-.omc/state/
+# OMC runtime state
+.omc/
