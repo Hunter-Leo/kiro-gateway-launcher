@@ -42,6 +42,7 @@ class ConfigVar:
         default: Default value used when the variable is not set.
         sensitive: If True, the value is partially masked in list view.
         allowed_values: Optional list of valid values shown as hint.
+        value_descriptions: Optional dict mapping allowed values to their descriptions.
     """
 
     key: str
@@ -49,6 +50,7 @@ class ConfigVar:
     default: str = ""
     sensitive: bool = False
     allowed_values: list[str] = field(default_factory=list)
+    value_descriptions: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -197,6 +199,12 @@ CONFIG_GROUPS: list[ConfigGroup] = [
                 description="How to handle thinking blocks in responses",
                 default="as_reasoning_content",
                 allowed_values=["as_reasoning_content", "remove", "pass", "strip_tags"],
+                value_descriptions={
+                    "as_reasoning_content": "Return as reasoning_content field (recommended)",
+                    "remove": "Remove thinking block completely",
+                    "pass": "Pass through with original tags",
+                    "strip_tags": "Remove tags but keep content",
+                },
             ),
         ],
     ),
@@ -438,8 +446,14 @@ class ConfigEditor:
             self._io.print(f"  Current: {_DIM}(not set){_RESET}")
 
         if var.allowed_values:
-            opts = " / ".join(var.allowed_values)
-            self._io.print(f"  Allowed: {_DIM}{opts}{_RESET}")
+            if var.value_descriptions:
+                self._io.print(f"  Allowed values:")
+                for val in var.allowed_values:
+                    desc = var.value_descriptions.get(val, "")
+                    self._io.print(f"    {_CYAN}{val}{_RESET} — {_DIM}{desc}{_RESET}")
+            else:
+                opts = " / ".join(var.allowed_values)
+                self._io.print(f"  Allowed: {_DIM}{opts}{_RESET}")
 
         if var.default:
             self._io.print(f"  Default: {_DIM}{var.default}{_RESET}")
