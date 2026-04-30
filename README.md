@@ -36,6 +36,52 @@ kiro-gateway-launcher
 kiro-gateway-launcher config --edit
 ```
 
+## Usage with Claude Code
+
+After starting the server, configure Claude Code to use it.
+
+### 1. Start the server
+
+```bash
+kiro-gateway-launcher
+```
+
+The server will start on `http://0.0.0.0:8001` by default.
+
+### 2. Configure Claude Code settings
+
+Edit `~/.claude/settings.json`:
+
+```json
+{
+  "apiConfiguration": {
+    "baseURL": "http://localhost:8001/v1",
+    "apiKey": "my-super-secret-password-123"
+  }
+}
+```
+
+**Note:** The `apiKey` must match the `PROXY_API_KEY` value in your configuration.
+
+### 3. Restart Claude Code
+
+Restart Claude Code to apply the new settings.
+
+### Custom Configuration
+
+If you changed the default settings:
+
+```json
+{
+  "apiConfiguration": {
+    "baseURL": "http://localhost:YOUR_PORT/v1",
+    "apiKey": "YOUR_PROXY_API_KEY"
+  }
+}
+```
+
+Replace `YOUR_PORT` and `YOUR_PROXY_API_KEY` with your configured values.
+
 ## Commands
 
 ### Start Server (default)
